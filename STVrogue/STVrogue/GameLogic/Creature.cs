@@ -89,7 +89,7 @@ namespace STVrogue.GameLogic
         public override void Move(Room r)
         {
             base.Move(r);
-            if (r.NumberOfMonsters > r.Capacity) // kutu note
+            if (r.NumberOfMonsters >= r.Capacity) // kutu note
             {
                 throw new ArgumentException();
             }
