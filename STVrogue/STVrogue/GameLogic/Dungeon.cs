@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -74,16 +74,16 @@ namespace STVrogue.GameLogic
             Room r = null;
             for (int k = 0 ; k<numberOfRooms; k++)
             {
-                int capacity = randomGenerator.NextInt(maximumRoomCapacity) + 1 ; // kutu note
+                int capacity = randomGenerator.NextInt(maximumRoomCapacity + 1);
                 if (k == 0)
                 {
-                    r = new Room("R" + k, RoomType.STARTroom, capacity); 
+                    r = new Room("R" + k, RoomType.STARTroom, 0);
                     StartRoom = r;
                     prev = r;
                 }
                 else if (k == numberOfRooms - 1)
                 {
-                    r = new Room("R" + k, RoomType.EXITroom, capacity);
+                    r = new Room("R" + k, RoomType.EXITroom, 0);
                     ExitRoom = r;
                     prev.Connect(r, Direction.EAST);
                     prev = r;
@@ -91,7 +91,6 @@ namespace STVrogue.GameLogic
                 else
                 {
                     r = new Room("R" + k, RoomType.ORDINARYroom, capacity);
-                    ExitRoom = r;
                     prev.Connect(r, Direction.EAST);
                     prev = r;
                 }
@@ -125,8 +124,11 @@ namespace STVrogue.GameLogic
                 int numOfChildrenToAdd = Math.Min(branchingDegree, numberOfRooms - Rooms.Count);
                 for (int k = 0; k < numOfChildrenToAdd; k++)
                 {
-                    int capacity = randomGenerator.NextInt(maximumRoomCapacity) + 1 ; // kutu note
-                    Room childRoom = new Room("R" + Rooms.Count, RoomType.ORDINARYroom, capacity);
+                    int nextIndex = Rooms.Count;
+                    bool isExit = nextIndex == numberOfRooms - 1;
+                    int capacity = isExit ? 0 : randomGenerator.NextInt(maximumRoomCapacity + 1);
+                    RoomType roomType = isExit ? RoomType.EXITroom : RoomType.ORDINARYroom;
+                    Room childRoom = new Room("R" + nextIndex, roomType, capacity);
                     Direction dir = Direction.NORTH;
                     switch (k % branchingDegree)
                     {
@@ -137,10 +139,10 @@ namespace STVrogue.GameLogic
                     R.Connect(childRoom, dir);
                     Rooms.Add(childRoom);
                     toBeExpanded.Add(childRoom);
+                    if (isExit)
+                        ExitRoom = childRoom;
                 }
             }
-            // now we have a tree with N rooms. We need to make the last room the exit-room.
-            ExitRoom = Rooms[Rooms.Count - 1];
         }
         
         /// <summary>
@@ -163,24 +165,32 @@ namespace STVrogue.GameLogic
             {
                 for (int j = 0; j < numOfRow && Rooms.Count < numberOfRooms; j++)
                 {
-                    int capacity = randomGenerator.NextInt(maximumRoomCapacity) + 1 ; // kutu note
-                    created[k,j] = new Room("R" + (k*numOfRow+j), RoomType.ORDINARYroom, capacity);
+                    int nextIndex = Rooms.Count;
+                    bool isStart = nextIndex == 0;
+                    bool isExit = nextIndex == numberOfRooms - 1;
+                    int capacity = (isStart || isExit) ? 0 : randomGenerator.NextInt(maximumRoomCapacity + 1);
+                    RoomType roomType = isStart ? RoomType.STARTroom
+                        : isExit ? RoomType.EXITroom
+                        : RoomType.ORDINARYroom;
+                    created[k,j] = new Room("R" + (k*numOfRow+j), roomType, capacity);
                     Rooms.Add(created[k,j]);
-                    // make the last added room to be the exit room:
-                    ExitRoom = created[k,j];
+                    if (isExit)
+                        ExitRoom = created[k,j];
+                    if (isStart)
+                        StartRoom = created[k,j];
                 }
             }
-            // make the (0,0) to be the start-room:
-            StartRoom = created[0, 0];
             // connect the rooms to form a 2D grid:
-            for (int k = 1; k < numOfColumn; k++)
+            for (int k = 0; k < numOfColumn; k++)
             {
-                for (int j = 1; j < numOfRow; j++)
+                for (int j = 0; j < numOfRow; j++)
                 {
                     if (created[k,j] == null)
                         continue;
-                    created[k,j].Connect(created[k-1,j], Direction.WEST);
-                    created[k,j].Connect(created[k,j-1], Direction.NORTH);
+                    if (k > 0 && created[k-1,j] != null)
+                        created[k,j].Connect(created[k-1,j], Direction.WEST);
+                    if (j > 0 && created[k,j-1] != null)
+                        created[k,j].Connect(created[k,j-1], Direction.NORTH);
                 }
             }
             //done
