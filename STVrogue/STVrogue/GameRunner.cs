@@ -81,16 +81,8 @@ namespace STVrogue
         /// </returns>
         public Judgement Run(TemporalProperty<Game> phi)
         {
+            Showwelcomemsg();
             // Don't write directly to system-console. Use methods from game.GameConsole:
-            _game.GameConsole.WriteLines(" _______ _________            _______  _______  _______           _______ ",
-               "(  ____ \\\\__   __/|\\     /|  (  ____ )(  ___  )(  ____ \\|\\     /|(  ____ \\",
-               "| (    \\/   ) (   | )   ( |  | (    )|| (   ) || (    \\/| )   ( || (    \\/",
-               "| (_____    | |   | |   | |  | (____)|| |   | || |      | |   | || (__    ",
-               "(_____  )   | |   ( (   ) )  |     __)| |   | || | ____ | |   | ||  __)   ",
-               "      ) |   | |    \\ \\_/ /   | (\\ (   | |   | || | \\_  )| |   | || (      ",
-               "/\\____) |   | |     \\   /    | ) \\ \\__| (___) || (___) || (___) || (____/\\",
-               "\\_______)   )_(      \\_/     |/   \\__/(_______)(_______)(_______)(_______/",
-               "Welcome stranger...");
             
             // ignore this judgement unless you do the "stronger system-testing" Optional.
             if (phi != null) phi.Reset();
@@ -101,101 +93,25 @@ namespace STVrogue
             while (!_game.Gameover && !quit)
             {
                 _console.clearConsoleEcho();
-                
-                var monsters = (from crit in _game.Player.Location.Creatures 
-                    select $"{crit.Name} ({crit.Id })").ToList() ;
-                var items = (from item in _game.Player.Location.Items
-                    select $"{item.GetType().Name} ({item.Id})").ToList() ;
-                
-                var neighbors = (from neighbor in _game.Player.Location.Neighbors 
-                    select $"{neighbor.Item1.Id}({neighbor.Item2})").ToList();
-                
-                _game.GameConsole.WriteLines("",
-                    $"TURN {_game.TurnNumber}",
-                    $"You are in a room ({_game.Player.Location.Id}). It is dark, and it feels dangerous...",
-                    "Monsters in the room: " + (monsters.Count == 0 ? "don't see one." : string.Join(", ", monsters)),
-                    "Items in the room: " + (items.Count == 0 ? "none. Sorry." : string.Join(", ", items)),
-                    "Rooms to go: " + (neighbors.Count == 0 ? "Hmm.. looks like you are trapped." : string.Join(",", neighbors)),
-                    "You are " + (_game.Player.Alive ? "alive" : "DEAD"), 
-                    $"Your health: {_game.Player.Hp}, kill-counts: {_game.Player.Kp}",
-                    "In your bag: nothing/nada/zero :(",
-                    "Your action: Move(m)   | Pick-items(p) | Do-nothing(SPACE) | Quit(q)",
-                    "             Attack(a) |    Flee(f)    | Use-item(u) ");
-                // determine what the user action is, and covert it to an instance of Command:
-                char c = GetUserOrTestAgentInput();
-                Command command = null;
-                switch (c)
-                {
-                    case 'm':
-                        var directions = (from neighbor in _game.Player.Location.Neighbors 
-                            select DirectionToLetter(neighbor.Item2)).ToList();
-                        _game.GameConsole.WriteLines(" Move to which room? " + string.Join("|", directions));
-                        char d = GetUserOrTestAgentInput();
-                        try
-                        {
-                            Direction chosenDirection = LetterToDirection(d);
-                            string roomId = _game.Player.Location.Neighbors.First(n => n.Item2 == chosenDirection).Item1.Id;
-                            command = new Command(CommandType.MOVE, roomId) ;
-                        }
-                        catch(Exception e) { }
-                        break;
-                    case 'a':
-                        command = new Command(CommandType.ATTACK, "");
-                        break;
-                    case 'u':
-                        command = new Command(CommandType.USE, "") ;
-                        break;
-                    case 'f':
-                        command = new Command(CommandType.FLEE, "");
-                        break;
-                    case 'p':
-                        command = new Command(CommandType.PICKUP, "");
-                        break;
-                    case ' ':
-                        command = new Command(CommandType.DoNOTHING, "");
-                        break;
-                    case 'q':
-                        _game.GameConsole.WriteLines("** Aaaw you QUIT!");
-                        quit = true;
-                        continue;
-                }
 
+                Showgamestate();
+                
+                Command command = Readcmd(ref quit);
+                
+                if (quit) break;
+                
                 if (command == null)
                 {
                     _game.GameConsole.WriteLines("** Invalid command. Try again.");
                     continue;
                 }
+
                 // now the command is known, invoke a single-turn update, and deal with
                 // printing proper msgs to the console:
-                _game.GameConsole.WriteLines("", "** "  + _game.Player.Name + " " + command);
-                switch (command.Name)
-                {
-                    case CommandType.MOVE:
-                        _game.Update(command);
-                        break;
-                    case CommandType.ATTACK :
-                        _game.GameConsole.WriteLines("      Clang! Wooosh. WHACK!");
-                        _game.Update(command);
-                        break;
-                    case CommandType.FLEE:
-                        _game.GameConsole.WriteLines("      We knew you are a coward.");
-                        _game.Update(command);
-                        break;
-                    case CommandType.PICKUP:
-                        _game.Update(command);
-                        break;
-                    case CommandType.USE:
-                        _game.Update(command);
-                        break;
-                    case CommandType.DoNOTHING:
-                        _game.GameConsole.WriteLines("      Lazy. Start working!");
-                        _game.Update(command);
-                        break;
-                }
-                
+                Execcmd(command);
                 phiJudgement = Check(phi);
             }
-            _game.GameConsole.WriteLines("** Game is over. Score:" + _game.Player.Kp + ". Go ahead and brag it out.");
+            Showendmsg();
             return phiJudgement;
         }
         
@@ -249,6 +165,159 @@ namespace STVrogue
                 return _game.GameConsole.ReadKey();
             }
         }
+
+        private Command Readcmd(ref bool quit)
+        {
+            char c = GetUserOrTestAgentInput();
+
+            switch (c)
+            {
+                case 'm': return Readmovecmd();
+                case 'a': return Readatkcmd();
+                case 'u': return Readusecmd();
+                case 'f': return new Command(CommandType.FLEE, "");
+                case 'p': return new Command(CommandType.PICKUP, "");
+                case ' ': return new Command(CommandType.DoNOTHING, "");
+                case 'q':
+                    _game.GameConsole.WriteLines("** Aaaw you QUIT!");
+                    quit = true;
+                    return null;
+                default:
+                    return null;
+            }
+        }
+
         
+        // read atk move and use cmds. these are to read user input
+        private Command Readmovecmd()
+        {
+            var directions = (from n in _game.Player.Location.Neighbors
+                select DirectionToLetter(n.Item2)).ToList();
+
+            _game.GameConsole.WriteLines("Move towards? " + string.Join("|", directions));
+
+            char c = GetUserOrTestAgentInput();
+
+            try
+            {
+                Direction dir = LetterToDirection(c);
+
+                string roomId = (from n in _game.Player.Location.Neighbors
+                    where n.Item2 == dir
+                    select n.Item1.Id).First();
+
+                return new Command(CommandType.MOVE, roomId);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+        
+        private Command Readatkcmd()
+        {
+            var monsters = _game.Player.Location.Creatures.ToList();
+
+            if (monsters.Count == 0)
+            {
+                _game.GameConsole.WriteLines("** No monsters around.....");
+                return null;
+            }
+
+            string target = monsters.First().Id;
+            return new Command(CommandType.ATTACK, target);
+        }
+        
+        private Command Readusecmd()
+        {
+            if (_game.Player.Bag.Count == 0)
+            {
+                _game.GameConsole.WriteLines("** Nothing to use.....");
+                return null;
+            }
+
+            var item = _game.Player.Bag.First();
+            return new Command(CommandType.USE, item.Id);
+        }
+
+        private void Execcmd(Command command)
+        {
+            _game.GameConsole.WriteLines("", "** " + _game.Player.Name + " " + command);
+            
+            switch (command.Name)
+            {
+                case CommandType.ATTACK:
+                    _game.GameConsole.WriteLines("Clang! WHACK!");
+                    break;
+
+                case CommandType.FLEE:
+                    _game.GameConsole.WriteLines("Coward!!!!");
+                    break;
+
+                case CommandType.DoNOTHING:
+                    _game.GameConsole.WriteLines(":3");
+                    break;
+
+                case CommandType.PICKUP:
+                    _game.GameConsole.WriteLines("Itemmaxxing");
+                    break;
+
+                case CommandType.USE:
+                    _game.GameConsole.WriteLines("You use an item");
+                    break;
+            }
+
+            _game.Update(command);
+        }
+        
+        private void Showgamestate()
+        {
+            var monsters = (from crit in _game.Player.Location.Creatures 
+                    select $"{crit.Name} ({crit.Id })")
+                .ToList();
+            
+            var items = (from item in _game.Player.Location.Items 
+                    select $"{item.GetType().Name} ({item.Id})")
+                .ToList();
+            
+            var bag = (from item in _game.Player.Bag 
+                    select $"{item.GetType().Name} ({item.Id})")
+                .ToList();
+            
+            var neighbors = (from neighbor in _game.Player.Location.Neighbors 
+                select $"{neighbor.Item1.Id}({neighbor.Item2})").ToList();
+            
+            _game.GameConsole.WriteLines("",
+                $"TURN {_game.TurnNumber}",
+                $"You are in a room ({_game.Player.Location.Id}). It is dark, and it feels dangerous...",
+                "Monsters in the room: " + (monsters.Count == 0 ? "don't see one." : string.Join(", ", monsters)),
+                "Items in the room: " + (items.Count == 0 ? "none. Sorry." : string.Join(", ", items)),
+                "Rooms to go: " + (neighbors.Count == 0 ? "Hmm.. looks like you are trapped." : string.Join(",", neighbors)),
+                "You are " + (_game.Player.Alive ? "alive" : "DEAD"), 
+                $"Your health: {_game.Player.Hp}, kill-counts: {_game.Player.Kp}",
+                "In your bag:" + (bag.Count == 0 ? "nothing :c" :  string.Join(", ", bag)), 
+                "",
+                "Your action: Move(m)   | Pickup(p) | Do-nothing(SPACE) | Quit(q)",
+                "             Attack(a) |    Flee(f)    | Use-item(u) ");
+        }
+        
+        
+        private void Showwelcomemsg()
+        {
+            _game.GameConsole.WriteLines(" _______ _________            _______  _______  _______           _______ ",
+                "(  ____ \\\\__   __/|\\     /|  (  ____ )(  ___  )(  ____ \\|\\     /|(  ____ \\",
+                "| (    \\/   ) (   | )   ( |  | (    )|| (   ) || (    \\/| )   ( || (    \\/",
+                "| (_____    | |   | |   | |  | (____)|| |   | || |      | |   | || (__    ",
+                "(_____  )   | |   ( (   ) )  |     __)| |   | || | ____ | |   | ||  __)   ",
+                "      ) |   | |    \\ \\_/ /   | (\\ (   | |   | || | \\_  )| |   | || (      ",
+                "/\\____) |   | |     \\   /    | ) \\ \\__| (___) || (___) || (___) || (____/\\",
+                "\\_______)   )_(      \\_/     |/   \\__/(_______)(_______)(_______)(_______/",
+                "Welcome stranger...");
+        }
+
+        private void Showendmsg()
+        {
+            _game.GameConsole.WriteLines("** Game is over. Score:" + _game.Player.Kp + ". Go ahead and brag it out.");
+        }
     }
 }
