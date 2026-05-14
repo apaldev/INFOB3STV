@@ -74,7 +74,7 @@ namespace STVrogue.GameLogic
             Room r = null;
             for (int k = 0 ; k<numberOfRooms; k++)
             {
-                int capacity = randomGenerator.NextInt(maximumRoomCapacity + 1);
+                int capacity = randomGenerator.NextInt(maximumRoomCapacity) + 1;
                 if (k == 0)
                 {
                     r = new Room("R" + k, RoomType.STARTroom, 0);

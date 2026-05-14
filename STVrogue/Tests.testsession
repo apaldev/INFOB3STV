@@ -1,0 +1,35 @@
+Test_GameConstructor (29 tests) Failed: One or more child tests had errors: 18 tests failed
+  Game_AllDifficultyModes_ConstructSuccessfully (3 tests) Success
+    Game_AllDifficultyModes_ConstructSuccessfully(ELITEmode) Success
+    Game_AllDifficultyModes_ConstructSuccessfully(NEWBIEmode) Success
+    Game_AllDifficultyModes_ConstructSuccessfully(NORMALmode) Success
+  Game_ImpossibleMonsterCount_Throws Failed:   constructor must throw when monster count exceeds dungeon capacity
+  Game_LinearTooFewRooms_Throws (3 tests) Failed: One or more child tests had errors: 3 tests failed
+    Game_LinearTooFewRooms_Throws(0) Failed:   constructor must throw when N<3 for a linear dungeon.
+    Game_LinearTooFewRooms_Throws(1) Failed:   constructor must throw when N<3 for a linear dungeon.
+    Game_LinearTooFewRooms_Throws(2) Failed:   constructor must throw when N<3 for a linear dungeon.
+  Game_MinimalValidConfig_DoesNotThrow (3 tests) Failed: One or more child tests had errors: 1 test failed
+    Game_MinimalValidConfig_DoesNotThrow(GRID,5) Success
+    Game_MinimalValidConfig_DoesNotThrow(LINEAR,3) Failed:   a minimal valid config for shape LINEAR must not throw
+    Game_MinimalValidConfig_DoesNotThrow(TREE,5) Success
+  Game_PlayerInitialState_KpZeroAndBagEmpty Success
+  Game_RagePotsInLinearDungeon_Throws Success
+  Game_TreeOrGridTooFewRooms_Throws (2 tests) Failed: One or more child tests had errors: 2 tests failed
+    Game_TreeOrGridTooFewRooms_Throws(GRID) Failed:   constructor must throw when N < 5 for a GRID dungeon
+    Game_TreeOrGridTooFewRooms_Throws(TREE) Failed:   constructor must throw when N < 5 for a TREE dungeon
+  Spec_GameConstructor (15 tests) Failed: One or more child tests had errors: 11 tests failed
+    Spec_GameConstructor(GRID,12,5,0,2,1,NORMALmode) Inconclusive: constructor threw for this config deemed impossible to satisfy
+    Spec_GameConstructor(GRID,12,5,2,0,1,NORMALmode) Inconclusive: constructor threw for this config deemed impossible to satisfy
+    Spec_GameConstructor(GRID,5,3,2,1,0,NEWBIEmode) Failed:   exit neighbor R1 must have capacity == γ (3)
+    Spec_GameConstructor(GRID,8,1,0,1,1,NEWBIEmode) Inconclusive: constructor threw for this config deemed impossible to satisfy
+    Spec_GameConstructor(GRID,8,3,4,0,0,ELITEmode) Failed:   exit neighbor R3 must have capacity == γ (3)
+    Spec_GameConstructor(LINEAR,12,1,4,0,0,NEWBIEmode) Failed:   exit neighbor R10 must have capacity == γ (1)
+    Spec_GameConstructor(LINEAR,12,3,0,0,1,NORMALmode) Failed:   exit neighbor R10 must have capacity == γ (3)
+    Spec_GameConstructor(LINEAR,12,5,2,2,1,ELITEmode) Failed:   exit neighbor R10 must have capacity == γ (5)
+    Spec_GameConstructor(LINEAR,5,1,4,2,0,NORMALmode) Inconclusive: constructor threw for this config deemed impossible to satisfy
+    Spec_GameConstructor(LINEAR,5,3,0,2,1,ELITEmode) Failed:   exit neighbor R3 must have capacity == γ (3)
+    Spec_GameConstructor(LINEAR,8,5,2,1,0,NORMALmode) Failed:   exit neighbor R6 must have capacity == γ (5)
+    Spec_GameConstructor(TREE,12,1,2,1,1,ELITEmode) Failed:   ordinary room R1 must have capacity >= 1
+    Spec_GameConstructor(TREE,5,5,4,0,1,NORMALmode) Failed:   exit neighbor R1 must have capacity == γ (5)
+    Spec_GameConstructor(TREE,8,3,0,2,0,NEWBIEmode) Failed:   exit neighbor R2 must have capacity == γ (3)
+    Spec_GameConstructor(TREE,8,5,4,1,0,NEWBIEmode) Failed:   ordinary room R1 must have capacity >= 1

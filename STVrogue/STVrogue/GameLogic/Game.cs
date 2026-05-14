@@ -80,10 +80,14 @@ namespace STVrogue.GameLogic
             Player = new Player("P0", "Bagginssess");
             STVControlledRandom.SetSeed(conf.RndSeed);
 
-            if (conf.NumberOfRooms < 5)
-                throw new ArgumentException("The dungeon must have at least 5 rooms.");
+            if (conf.DungeonShape == DungeonShapeType.LINEAR && conf.NumberOfRooms < 3)
+                throw new Exception("Linear dungeons must have at least 3 rooms.");
+            if (conf.DungeonShape != DungeonShapeType.LINEAR && conf.NumberOfRooms < 5)
+                throw new Exception("Tree and Grid dungeons must have at least 5 rooms.");
+            if (conf.InitialNumberOfMonsters > (conf.NumberOfRooms - 2) * conf.MaxRoomCapacity)
+                throw new Exception("Too many monsters for the dungeon's capacity.");
             if (conf.MaxRoomCapacity <= 0)
-                throw new ArgumentException("Room capacity must be greater than 0.");
+                throw new Exception("Room capacity must be greater than 0.");
 
             Dungeon = new Dungeon(this._rnd, conf.DungeonShape, conf.NumberOfRooms, conf.MaxRoomCapacity);
             Player.Location = Dungeon.StartRoom;
