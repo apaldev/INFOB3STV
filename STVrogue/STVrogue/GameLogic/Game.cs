@@ -36,7 +36,7 @@ namespace STVrogue.GameLogic
         
         public Dungeon Dungeon { get ; private set; }
 
-        public bool Gameover { get; private set; } = false;
+        public bool Gameover { get; private set; }
 
         /// <summary>
         /// To count the number of passed turns. 
@@ -64,7 +64,7 @@ namespace STVrogue.GameLogic
         /// Check out the other implementation of <see cref="IRandomGenerator"/>, namely
         /// <see cref="STVControlledRandom"/>, or else write your own implementation.
         /// </summary>
-        IRandomGenerator rnd = new RandomGenerator();
+        IRandomGenerator _rnd = new RandomGenerator();
         //IRandomGenerator rnd = new STVControlledRandom();
         
         #endregion
@@ -76,24 +76,25 @@ namespace STVrogue.GameLogic
         /// </summary>
         public Game(GameConfiguration conf) 
         {
-            // A dummy implementation that ignores the configuration. You should fix this
-            // by implementing this constructor according to its description in the Project
-            // Document.
-            Player = new Player("P0", "Bagginssess");
             Config = conf;
+            Player = new Player("P0", "Bagginssess");
             STVControlledRandom.SetSeed(conf.RndSeed);
-            STVLogger.Log(">>> Creating an instance of Game, but ignoring the passed configuration. Fix this.");
-            // Dummy implementation that always creates a linear dungeon of 4 rooms with
-            // some monsters and item
-            Dungeon = new Dungeon(this.rnd, DungeonShapeType.LINEAR, 4, 2);
+
+            if (conf.NumberOfRooms < 5)
+                throw new ArgumentException("The dungeon must have at least 5 rooms.");
+            if (conf.MaxRoomCapacity <= 0)
+                throw new ArgumentException("Room capacity must be greater than 0.");
+
+            Dungeon = new Dungeon(this._rnd, conf.DungeonShape, conf.NumberOfRooms, conf.MaxRoomCapacity);
             Player.Location = Dungeon.StartRoom;
-            SeedMonstersAndItems(2, 2, 2);
+
+            // Populate the dungeon with monsters and items
+            if (!SeedMonstersAndItems(conf.InitialNumberOfMonsters, conf.InitialNumberOfHealingPots, conf.InitialNumberOfRagePots)) {
+                throw new Exception("Failed to populate the dungeon with the specified configuration.");
+            }
         }
-        
+
         /// <summary>
-        /// THIS IS A DUMMY IMPLEMENTAION. you are expected to implement
-        /// this method according to the description in the Project Document.
-        /// 
         /// <para></para>
         /// Populate the dungeon in this Game with the specified number of monsters and items.
         ///
@@ -112,14 +113,38 @@ namespace STVrogue.GameLogic
         /// </summary>
         bool SeedMonstersAndItems(int numberOfMonster, int numberOfHealingPotion, int numberOfRagePotion)
         {
-            // dummy implemetation that just put some monsters and pots in the room after-after
-            // the start room
-            Room r = Dungeon.Rooms[2];
-            r.Creatures.Add(new Monster("M0", "Goblin"));
-            r.Creatures.Add(new Monster("M1", "Orc"));
-            r.Items.Add(new HealingPotion("H0",2));
-            r.Items.Add(new HealingPotion("H1",2));
-            return true;
+            var rooms = Dungeon.Rooms.Where(r => r != Dungeon.StartRoom && r != Dungeon.ExitRoom).ToList();
+            if (rooms.Count == 0) return false;
+
+            int maxRoomsWithItems = rooms.Count / 2;
+            int roomsWithItems = 0;
+
+            // Distribute monsters
+            for (int i = 0; i < numberOfMonster; i++)
+            {
+                var room = rooms[_rnd.NextInt(rooms.Count)];
+                if (room.Creatures.Count < room.Capacity)
+                {
+                    room.Creatures.Add(new Monster($"M{i}", "Monster"));
+                }
+            }
+
+            for (int i = 0; i < numberOfHealingPotion; i++)
+            {
+                var room = rooms[_rnd.NextInt(rooms.Count)];
+                if (room.Items.Any(item => item is HealingPotion)) continue; // Avoid neighboring rooms
+                room.Items.Add(new HealingPotion($"H{i}", 2));
+                roomsWithItems++;
+                if (roomsWithItems > maxRoomsWithItems) return false;
+            }
+
+            foreach (var room in rooms.Where(r => r.IsLeafRoom))
+            {
+                if (numberOfRagePotion <= 0) break;
+                room.Items.Add(new RagePotion($"R{numberOfRagePotion--}"));
+            }
+
+            return numberOfRagePotion == 0;
         }
         
 
@@ -131,7 +156,20 @@ namespace STVrogue.GameLogic
         /// </summary>
         public bool Flee(Creature c)
         {
-            throw new NotImplementedException();
+            if (Config.DifficultyMode == DifficultyMode.ELITEmode && c is Player player && player.Enraged)
+            {
+                GameConsole.WriteLines("Fleeing is not allowed while enraged in Elite mode.");
+                return false;
+            }
+
+            var neighbors = c.Location.Neighbors;
+            var targetRoom = neighbors.FirstOrDefault(n => n.Item1.Creatures.Count < n.Item1.Capacity).Item1;
+            if (targetRoom != null)
+            {
+                c.Move(targetRoom);
+                return true;
+            }
+            return false;
         }
 
         /// <summary>
@@ -143,22 +181,119 @@ namespace STVrogue.GameLogic
         /// </summary>
         public void Update(Command playerAction)
         {
+            // Validate player command
+            if (playerAction == null || !Enum.IsDefined(typeof(CommandType), playerAction.Name))
+            {
+                GameConsole.WriteLines("Invalid command.");
+                return;
+            }
+
+            // Handle the player's action first
             switch (playerAction.Name)
             {
                 case CommandType.MOVE:
                     string roomId = playerAction.Args[0];
-                    // dummy logic for move-to:
-                    Room roomToMoveTo = (from r in Dungeon.Rooms where r.Id == roomId select r).First();
-                    Player.Move(roomToMoveTo);
+                    Room roomToMoveTo = Dungeon.Rooms.FirstOrDefault(r => r.Id == roomId);
+                    if (roomToMoveTo != null && Player.Location.Neighbors.Any(n => n.Item1 == roomToMoveTo) && roomToMoveTo.Creatures.Count < roomToMoveTo.Capacity)
+                    {
+                        Player.Move(roomToMoveTo);
+                        GameConsole.WriteLines($"Player moved to room {roomToMoveTo.Id}.");
+                    }
+                    else
+                    {
+                        GameConsole.WriteLines("Move action not possible.");
+                    }
                     break;
-                case CommandType.ATTACK :
+
+                case CommandType.ATTACK:
+                    if (Player.Location.Creatures.Any(c => c is Monster))
+                    {
+                        Creature target = Player.Location.Creatures.First(c => c is Monster);
+                        Player.Attack(target);
+                        GameConsole.WriteLines($"Player attacked {target.Id}. {target.Id} HP: {target.Hp}");
+                        if (!target.Alive)
+                        {
+                            Player.Kp++;
+                            Player.Location.Creatures.Remove(target);
+                            GameConsole.WriteLines($"{target.Id} has been defeated.");
+                        }
+                    }
+                    else
+                    {
+                        GameConsole.WriteLines("No monsters to attack.");
+                    }
                     break;
+
                 case CommandType.FLEE:
+                    if (Flee(Player))
+                    {
+                        GameConsole.WriteLines("Player fled to a neighboring room.");
+                    }
+                    else
+                    {
+                        GameConsole.WriteLines("Flee action not possible.");
+                    }
                     break;
+
                 case CommandType.DoNOTHING:
+                    GameConsole.WriteLines("Player chose to do nothing.");
                     break;
             }
+
+            // Handle monster actions
+            foreach (var monster in Dungeon.Rooms.SelectMany(r => r.Creatures).OfType<Monster>())
+            {
+                if (monster.Location == Player.Location)
+                {
+                    monster.Attack(Player);
+                    GameConsole.WriteLines($"{monster.Id} attacked Player. Player HP: {Player.Hp}");
+                    if (!Player.Alive)
+                    {
+                        Gameover = true;
+                        GameConsole.WriteLines("Player has been defeated. Game over.");
+                        return;
+                    }
+                }
+                else
+                {
+                    // Prioritize attacking the player if possible
+                    if (monster.Location.Neighbors.Any(n => n.Item1 == Player.Location))
+                    {
+                        monster.Move(Player.Location);
+                        GameConsole.WriteLines($"{monster.Id} moved to attack Player.");
+                    }
+                    else
+                    {
+                        // Randomly decide monster action (move, do nothing, or flee)
+                        int action = _rnd.NextInt(3);
+                        if (action == 0) // Move
+                        {
+                            Room targetRoom = monster.Location.Neighbors.FirstOrDefault(n => n.Item1.Creatures.Count < n.Item1.Capacity).Item1;
+                            if (targetRoom != null)
+                            {
+                                monster.Move(targetRoom);
+                                GameConsole.WriteLines($"{monster.Id} moved to room {targetRoom.Id}.");
+                            }
+                        }
+                        else if (action == 1) // Flee
+                        {
+                            if (Flee(monster))
+                            {
+                                GameConsole.WriteLines($"{monster.Id} fled to a neighboring room.");
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (Player.Location == Dungeon.ExitRoom && !Dungeon.Rooms.SelectMany(r => r.Creatures).Any(c => c is Monster)) {
+                Gameover = true;
+                GameConsole.WriteLines("Congratulations! You have won the game.");
+                return;
+            }
+
             TurnNumber++;
+            GameConsole.WriteLines($"Turn {TurnNumber} completed.");
         }
     }
 }

@@ -83,23 +83,21 @@ namespace STVrogue
         {
             Showwelcomemsg();
             // Don't write directly to system-console. Use methods from game.GameConsole:
-            
+
             // ignore this judgement unless you do the "stronger system-testing" Optional.
             if (phi != null) phi.Reset();
             Judgement phiJudgement = Check(phi);
-            
+
             // The game loop. Repeat until gameover or user quit:
             bool quit = false;
             while (!_game.Gameover && !quit)
             {
                 _console.clearConsoleEcho();
-
                 Showgamestate();
-                
+
                 Command command = Readcmd(ref quit);
-                
                 if (quit) break;
-                
+
                 if (command == null)
                 {
                     _game.GameConsole.WriteLines("** Invalid command. Try again.");
@@ -111,10 +109,11 @@ namespace STVrogue
                 Execcmd(command);
                 phiJudgement = Check(phi);
             }
+
             Showendmsg();
             return phiJudgement;
         }
-        
+
         Judgement Check(TemporalProperty<Game> phi)
         {
             if (phi == null) return Judgement.Inconclusive;
@@ -242,28 +241,24 @@ namespace STVrogue
 
         private void Execcmd(Command command)
         {
-            _game.GameConsole.WriteLines("", "** " + _game.Player.Name + " " + command);
-            
+            _game.GameConsole.WriteLines("", $"** {_game.Player.Name} executes {command.Name}");
+
             switch (command.Name)
             {
                 case CommandType.ATTACK:
-                    _game.GameConsole.WriteLines("Clang! WHACK!");
+                    _game.GameConsole.WriteLines("Player attacks!");
                     break;
-
                 case CommandType.FLEE:
-                    _game.GameConsole.WriteLines("Coward!!!!");
+                    _game.GameConsole.WriteLines("Player flees!");
                     break;
-
                 case CommandType.DoNOTHING:
-                    _game.GameConsole.WriteLines(":3");
+                    _game.GameConsole.WriteLines("Player does nothing.");
                     break;
-
                 case CommandType.PICKUP:
-                    _game.GameConsole.WriteLines("Itemmaxxing");
+                    _game.GameConsole.WriteLines("Player picks up an item.");
                     break;
-
                 case CommandType.USE:
-                    _game.GameConsole.WriteLines("You use an item");
+                    _game.GameConsole.WriteLines("Player uses an item.");
                     break;
             }
 
@@ -272,22 +267,11 @@ namespace STVrogue
         
         private void Showgamestate()
         {
-            var monsters = (from crit in _game.Player.Location.Creatures 
-                    select $"{crit.Name} ({crit.Id })")
-                .ToList();
-            
-            var items = (from item in _game.Player.Location.Items 
-                    select $"{item.GetType().Name} ({item.Id})")
-                .ToList();
-            
-            var bag = (from item in _game.Player.Bag 
-                    select $"{item.GetType().Name} ({item.Id})")
-                .ToList();
-            
-            var neighbors = (from neighbor in _game.Player.Location.Neighbors 
-                select $"{neighbor.Item1.Id}({neighbor.Item2})").ToList();
-            
-            _game.GameConsole.WriteLines("",
+            var monsters = _game.Player.Location.Creatures.Select(c => c.Name).ToList();
+            var items = _game.Player.Location.Items.Select(i => i.GetType().Name).ToList();
+            var neighbors = _game.Player.Location.Neighbors.Select(n => n.Item1.Id).ToList();
+
+            _game.GameConsole.WriteLines(
                 $"TURN {_game.TurnNumber}",
                 $"You are in a room ({_game.Player.Location.Id}). It is dark, and it feels dangerous...",
                 "Monsters in the room: " + (monsters.Count == 0 ? "don't see one." : string.Join(", ", monsters)),
@@ -295,7 +279,7 @@ namespace STVrogue
                 "Rooms to go: " + (neighbors.Count == 0 ? "Hmm.. looks like you are trapped." : string.Join(",", neighbors)),
                 "You are " + (_game.Player.Alive ? "alive" : "DEAD"), 
                 $"Your health: {_game.Player.Hp}, kill-counts: {_game.Player.Kp}",
-                "In your bag:" + (bag.Count == 0 ? "nothing :c" :  string.Join(", ", bag)), 
+                "In your bag:" + (_game.Player.Bag.Count == 0 ? "nothing :c" :  string.Join(", ", _game.Player.Bag)), 
                 "",
                 "Your action: Move(m)   | Pickup(p) | Do-nothing(SPACE) | Quit(q)",
                 "             Attack(a) |    Flee(f)    | Use-item(u) ");
@@ -321,3 +305,4 @@ namespace STVrogue
         }
     }
 }
+

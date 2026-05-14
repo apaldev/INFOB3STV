@@ -20,7 +20,7 @@ namespace STVrogue.GameLogic
         /// <summary>
         /// All rooms in the dungeon, including the start and exit rooms.
         /// </summary>
-        public List<Room> Rooms { get; } = new List<Room>();
+        public List<Room> Rooms { get; } = [];
         public Room StartRoom { get; protected set; }
         public Room ExitRoom { get; protected set; }
         
@@ -297,6 +297,11 @@ namespace STVrogue.GameLogic
         /// The number of monsters in this room. The player does not count as a monster.
         /// </summary>
         public int NumberOfMonsters => Creatures.Count(c => c is Monster);
+
+        /// <summary>
+        /// Check if this is a leaf room (a room with no children).
+        /// </summary>
+        public bool IsLeafRoom => Neighbors.Count == 1;
 
         #endregion
 
